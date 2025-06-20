@@ -1,0 +1,61 @@
+name: Deploy delete-product
+
+on:
+  push:
+    branches:
+      - qa
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 400 key.pem
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+
+            echo "📦 Updating Docker environment for delete-product..."
+
+            # Instalar Docker si no está instalado
+            if ! command -v docker &> /dev/null
+            then
+              echo "🛠 Installing Docker..."
+              sudo apt update
+              sudo apt install -y docker.io
+              sudo systemctl start docker
+              sudo systemctl enable docker
+            fi
+
+            # Detener y eliminar contenedor anterior
+            sudo docker stop delete-product || true
+            sudo docker rm delete-product || true
+
+            # Clonar y compilar el proyecto más reciente
+            rm -rf ~/delete-product
+            git clone https://github.com/andrespaida/delete_product.git ~/delete-product
+            cd ~/delete-product
+            git checkout qa
+
+            # Reconstruir imagen con código actualizado
+            sudo docker build -t delete-product .
+
+            # Ejecutar contenedor con reinicio automático
+            sudo docker run -d --name delete-product -p 4004:4004 \
+              --restart=always \
+              -e MONGODB_URI=mongodb://13.222.75.144:27017 \
+              -e DB_NAME=toyshop_db \
+              -e PORT=4004 \
+              delete-product
+
+            echo "✅ delete-product deployed successfully"
+            sudo docker ps -a
+          EOF
