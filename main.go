@@ -22,7 +22,6 @@ func main() {
 
 	r := gin.Default()
 
-	// Middleware CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -32,7 +31,6 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Ruta DELETE
 	r.DELETE("/products/:id", handlers.DeleteProduct)
 
 	port := os.Getenv("PORT")

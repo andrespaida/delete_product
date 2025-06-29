@@ -25,7 +25,6 @@ jobs:
 
             echo "📦 Updating Docker environment for delete-product..."
 
-            # Instalar Docker si no está instalado
             if ! command -v docker &> /dev/null
             then
               echo "🛠 Installing Docker..."
@@ -35,20 +34,16 @@ jobs:
               sudo systemctl enable docker
             fi
 
-            # Detener y eliminar contenedor anterior
             sudo docker stop delete-product || true
             sudo docker rm delete-product || true
 
-            # Clonar y compilar el proyecto más reciente
             rm -rf ~/delete-product
             git clone https://github.com/andrespaida/delete_product.git ~/delete-product
             cd ~/delete-product
             git checkout qa
 
-            # Reconstruir imagen con código actualizado
             sudo docker build -t delete-product .
 
-            # Ejecutar contenedor con reinicio automático
             sudo docker run -d --name delete-product -p 4004:4004 \
               --restart=always \
               -e MONGODB_URI=mongodb://13.222.75.144:27017 \
