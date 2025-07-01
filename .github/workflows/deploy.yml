@@ -46,7 +46,7 @@ jobs:
 
             sudo docker run -d --name delete-product -p 4004:4004 \
               --restart=always \
-              -e MONGODB_URI=mongodb://13.222.75.144:27017 \
+              -e MONGODB_URI=mongodb://52.21.72.12:27017 \
               -e DB_NAME=toyshop_db \
               -e PORT=4004 \
               delete-product
