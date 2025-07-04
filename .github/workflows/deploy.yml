@@ -1,0 +1,74 @@
+name: Build and Deploy delete-product to EC2 from MAIN
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: main
+
+    steps:
+      # Checkout the source code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Authenticate with Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # Build Docker image with 'main' tag
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/delete-product:${{ env.IMAGE_TAG }} .
+
+      # Push image to Docker Hub
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/delete-product:${{ env.IMAGE_TAG }}
+
+      # Set up SSH key to connect to EC2
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 400 key.pem
+
+      # SSH into EC2 and deploy using the image from Docker Hub
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+            set -e
+
+            echo "📦 Deploying delete-product using Docker Hub image (main)..."
+
+            # Ensure Docker is installed
+            if ! command -v docker &> /dev/null; then
+              echo "🛠 Installing Docker..."
+              sudo apt update
+              sudo apt install -y docker.io
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            else
+              echo "✅ Docker is already installed."
+            fi
+
+            # Remove existing container if running
+            sudo docker rm -f delete-product || true
+
+            # Pull the 'main' image from Docker Hub
+            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/delete-product:${{ env.IMAGE_TAG }}
+
+            # Run the new container
+            sudo docker run -d --name delete-product \
+              -p 4004:4004 \
+              --restart=always \
+              -e MONGODB_URI=mongodb://52.21.72.12:27017 \
+              -e DB_NAME=toyshop_db \
+              -e PORT=4004 \
+              ${{ secrets.DOCKER_USERNAME }}/delete-product:${{ env.IMAGE_TAG }}
+
+            echo "✅ delete-product deployed successfully (main)"
+            sudo docker ps -a
+          EOF
